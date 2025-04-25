@@ -1,34 +1,51 @@
 <p align="left">
-    <a href="https://hub.docker.com/r/esailors/aws-ecr-http-proxy" alt="Pulls">
-        <img src="https://img.shields.io/docker/pulls/esailors/aws-ecr-http-proxy" /></a>
-    <a href="https://www.esailors.de" alt="Maintained">
-        <img src="https://img.shields.io/maintenance/yes/2022.svg" /></a>
-
+    <a href="https://hub.docker.com/r/craftech/aws-ecr-http-proxy" alt="Pulls">
+        <img src="https://img.shields.io/docker/pulls/craftech/aws-ecr-http-proxy" /></a>
+    <a href="https://www.craftech.io" alt="Maintained">
+        <img src="https://img.shields.io/maintenance/yes/2025.svg" /></a>
 </p>
 
 # aws-ecr-http-proxy
 
-A very simple nginx push/pull proxy that forwards requests to AWS ECR and caches the responses locally.
+A simple, production-ready Nginx proxy that caches and forwards requests to **AWS ECR**, including support for **public and private ECR**. Enhanced by [Craftech](https://www.craftech.io), the proxy includes fine-grained access control, optional authentication, and Helm deployment support.
 
-### Configuration:
-The proxy is packaged in a docker container and can be configured with following environment variables:
+---
 
-| Environment Variable                | Description                                    | Status                            | Default    |
-| :---------------------------------: | :--------------------------------------------: | :-------------------------------: | :--------: |
-| `AWS_REGION`                        | AWS Region for AWS ECR                         | Required                          |            |
-| `AWS_ACCESS_KEY_ID`                 | AWS Account Access Key ID                      | Optional                          |            |
-| `AWS_SECRET_ACCESS_KEY`             | AWS Account Secret Access Key                  | Optional                          |            |
-| `AWS_USE_EC2_ROLE_FOR_AUTH`                  | Set this to true if we do want to use aws roles for authentication instead of providing the secret and access keys explicitly | Optional                          |            |
-| `UPSTREAM`                          | URL for AWS ECR                                | Required                          |            |
-| `RESOLVER`                          | DNS server to be used by proxy                 | Required                          |            |
-| `PORT`                              | Port on which proxy listens                    | Required                          |            |
-| `CACHE_MAX_SIZE`                    | Maximum size for cache volume                  | Optional                          |  `75g`     |
-| `CACHE_KEY`                         | Cache key used for the content by nginx        | Optional                          |  `$uri`    |
-| `ENABLE_SSL`                        | Used to enable SSL/TLS for proxy               | Optional                          | `false`    |
-| `REGISTRY_HTTP_TLS_KEY`             | Path to TLS key in the container               | Required with TLS                 |            |
-| `REGISTRY_HTTP_TLS_CERTIFICATE`     | Path to TLS cert in the container              | Required with TLS                 |            |
+### New Features:
 
-### Example:
+- ✅ **Fine-grained access control**: define a list of allowed repositories per proxy instance via `ALLOWED_REPOSITORIES`.
+- ✅ **Public ECR support**: works with `public.ecr.aws`.
+- ✅ **Optimized for Docker clients**: fully compatible with Docker pull/push workflows.
+- ✅ **Flexible deployment**: includes Docker, Kubernetes (Helm), and Ansible options.
+- ✅ **Improved logging and metrics support** (WIP).
+- ✅ **Modular Lua-based proxy logic** using OpenResty.
+- ✅ **Maintained by [Craftech](https://www.craftech.io)** as of 2025.
+
+---
+
+### Configuration
+
+The proxy is packaged as a Docker container and can be configured using the following environment variables:
+
+| Environment Variable                | Description                                                                   | Status                            | Default    |
+| :---------------------------------:| :-----------------------------------------------------------------------------| :-------------------------------: | :--------: |
+| `AWS_REGION`                       | AWS Region for AWS ECR                                                        | Required                          |            |
+| `AWS_ACCESS_KEY_ID`               | AWS Account Access Key ID                                                     | Optional                          |            |
+| `AWS_SECRET_ACCESS_KEY`           | AWS Account Secret Access Key                                                 | Optional                          |            |
+| `AWS_USE_EC2_ROLE_FOR_AUTH`       | Use EC2 IAM Role for authentication                                           | Optional                          | `false`    |
+| `UPSTREAM`                         | Base URL for AWS ECR (private or public)                                      | Required                          |            |
+| `RESOLVER`                         | DNS resolver for Nginx                                                        | Required                          |            |
+| `PORT`                             | Proxy listening port                                                           | Required                          |            |
+| `CACHE_MAX_SIZE`                   | Maximum cache volume size                                                     | Optional                          | `75g`      |
+| `CACHE_KEY`                        | Cache key for content                                                         | Optional                          | `$uri`     |
+| `ENABLE_SSL`                       | Enable SSL/TLS                                                                | Optional                          | `false`    |
+| `REGISTRY_HTTP_TLS_KEY`           | TLS key path inside container                                                 | Required with TLS                 |            |
+| `REGISTRY_HTTP_TLS_CERTIFICATE`   | TLS cert path inside container                                                | Required with TLS                 |            |
+| `ALLOWED_REPOSITORIES`            | Comma-separated list of repos to allow (e.g. `nginx,redis,zeroq/*`)           | Optional                          | (Allow all)|
+
+---
+
+### Example (Docker)
 
 ```sh
 docker run -d --name docker-registry-proxy --net=host \
@@ -37,41 +54,62 @@ docker run -d --name docker-registry-proxy --net=host \
   -v /registry/key.pem:/opt/ssl/key.pem \
   -e PORT=5000 \
   -e RESOLVER=8.8.8.8 \
-  -e UPSTREAM=https://XXXXXXXXXX.dkr.ecr.eu-central-1.amazonaws.com \
-  -e AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
-  -e AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
-  -e AWS_REGION=${AWS_DEFAULT_REGION} \
-  -e CACHE_MAX_SIZE=100g \
+  -e UPSTREAM=https://public.ecr.aws/a5w2e8z7 \
+  -e AWS_REGION=us-east-1 \
   -e ENABLE_SSL=true \
   -e REGISTRY_HTTP_TLS_KEY=/opt/ssl/key.pem \
   -e REGISTRY_HTTP_TLS_CERTIFICATE=/opt/ssl/certificate.pem \
-  esailors/aws-ecr-http-proxy:latest
+  -e ALLOWED_REPOSITORIES=zeroq/*,nginx,alpine \
+  craftech/aws-ecr-http-proxy:latest
 ```
 
-If you ran this command on "registry-proxy.example.com" you can now get your images using `docker pull registry-proxy.example.com:5000/repo/image`.
+You can now pull from your proxy like:
+
+```sh
+docker pull docker.zeroq.cl:5000/zeroq/admin:latest
+```
+
+---
 
 ### Deploying the proxy
 
-#### Deploying with ansible
+#### On Kubernetes (Helm)
 
-Modify the ansible role [variables](https://github.com/eSailors/aws-ecr-http-proxy/tree/master/roles/docker-registry-proxy/defaults) according to your need and run the playbook as follow:
-```sh
-ansible-playbook -i hosts playbook-docker-registry-proxy.yaml
-```
-In case you want to enable SSL/TLS please replace the SSL certificates with the valid ones in [roles/docker-registry-proxy/files/*.pem](https://github.com/eSailors/aws-ecr-http-proxy/tree/master/roles/docker-registry-proxy/files)
+> A Helm chart is available and maintained for this version.
 
-#### Deploying on Kubernetes with Helm
-You can install on Kubernetes using the [community-maintained chart](https://github.com/evryfs/helm-charts/tree/master/charts/ecr-proxy) like this:
-
-```shell
-helm repo add evryfs-oss https://evryfs.github.io/helm-charts/
-helm install evryfs-oss/ecr-proxy --name ecr-proxy --namespace ecr-proxy
+```bash
+helm repo add craftech https://charts.craftech.io
+helm install ecr-proxy craftech/ecr-proxy -n ecr-proxy --create-namespace \
+  -f values.yaml
 ```
 
-See the [values-file](https://github.com/evryfs/helm-charts/blob/master/charts/ecr-proxy/values.yaml) for configuration parameters.
+Refer to the chart documentation for a full list of configurable values.
 
+---
 
-### Note on SSL/TLS
-The proxy is using `HTTP` (plain text) as default protocol for now. So in order to avoid docker client complaining either:
- - (**Recommended**) Enable SSL/TLS using `ENABLE_SSL` configuration. For that you will have to mount your **valid** certificate/key in the container and pass the paths using  `REGISTRY_HTTP_TLS_*` variables.
- - Mark the registry host as insecure in your client [deamon config](https://docs.docker.com/registry/insecure/).
+### SSL/TLS Options
+
+To enable encrypted HTTPS access to your proxy:
+
+1. Set `ENABLE_SSL=true`
+2. Mount your valid `.pem` files into the container
+3. Provide the correct environment variables:
+   - `REGISTRY_HTTP_TLS_KEY`
+   - `REGISTRY_HTTP_TLS_CERTIFICATE`
+
+Alternatively, for testing purposes, mark the proxy host as **insecure** in your Docker client configuration:
+
+```json
+{
+  "insecure-registries": ["docker.zeroq.cl:5000"]
+}
+```
+
+---
+
+### Maintainers
+
+Originally developed by [eSailors](https://www.esailors.de), now maintained and extended by [Craftech](https://www.craftech.io).
+
+For contributions, issues, or feature requests, please open a ticket or PR on GitHub.
+
