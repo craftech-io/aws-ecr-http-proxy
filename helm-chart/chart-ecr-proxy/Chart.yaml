@@ -1,0 +1,31 @@
+apiVersion: v2
+name: chart-ecr-proxy
+description: A Helm chart for Kubernetes ECR-Proxy for ECR Registries public access
+type: application
+version: 1.0.2
+appVersion: 1.0.13
+
+home: https://github.com/craftech-devops/chart-ecr-proxy
+sources:
+  - https://github.com/craftech-devops/chart-ecr-proxy
+maintainers:
+  - name: Lautaro
+    email: lautaro@craftech.io
+
+keywords:
+  - ecr
+  - docker
+  - proxy
+  - caching
+  - kubernetes
+  - openresty
+  - aws
+
+annotations:
+  createdBy: craftech
+  artifacthub.io/license: Apache-2.0
+
+dependencies:
+  - name: common
+    version: 2.0.x
+    repository: https://charts.bitnami.com/bitnami
